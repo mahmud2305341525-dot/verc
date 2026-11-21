@@ -1,0 +1,42 @@
+name: Scheduler
+
+# Replaces `php artisan schedule:run` (Vercel has no always-on server).
+# Needs repository secrets: APP_URL (https://your-app.vercel.app, no trailing slash) and CRON_SECRET.
+#
+# NOTE: GitHub's minimum schedule is every 5 minutes and runs can be delayed by several
+# minutes under load. The safety timers / stale-trip checks are time-sensitive; for true
+# 1-minute precision use cron-job.org (free) or Vercel Cron on the Pro plan - see docs/VERCEL_DEPLOYMENT.md.
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # frequent: safety timers + stale trips
+    - cron: '17 * * * *'    # hourly:   purge old trips
+    - cron: '0 12 * * *'    # daily:    12:00 UTC = 18:00 Asia/Dhaka (scores + event reminders)
+  workflow_dispatch:
+    inputs:
+      group:
+        description: 'Which group to run'
+        type: choice
+        options: [frequent, hourly, daily]
+        default: frequent
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cron endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_GROUP: ${{ inputs.group }}
+        run: |
+          case "$SCHEDULE" in
+            '*/5 * * * *') GROUP=frequent ;;
+            '17 * * * *')  GROUP=hourly ;;
+            '0 12 * * *')  GROUP=daily ;;
+            *)             GROUP="${INPUT_GROUP:-frequent}" ;;
+          esac
+          echo "Running group: $GROUP"
+          curl -fsS --retry 2 --retry-delay 5 --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/internal/cron/$GROUP"

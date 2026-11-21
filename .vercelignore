@@ -1,0 +1,19 @@
+# Not needed at runtime (Vercel runs `composer install` itself)
+/vendor
+/node_modules
+/tests
+/docs
+/.github
+/storage/logs
+/storage/framework
+*.bat
+.phpunit.result.cache
+phpunit.xml
+.env
+.env.*
+!.env.example
+
+# public/index.php is for traditional hosting only; Vercel uses api/index.php
+/public/index.php
+/public/.htaccess
+/public/hot
